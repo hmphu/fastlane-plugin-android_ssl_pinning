@@ -7,43 +7,45 @@ module Fastlane
     class AndroidSslPinningAction < Action
       def self.run(params)
         UI.message("👷 Starting SSL Pinning setup")
-        xml_path = params[:xml_path]
-        domains = params[:domains]
-        
-        # Open XML for modification
-        doc = File.open(xml_path) { |f| Nokogiri::XML(f) }
-
-        # Remove all <domain-config> elements
-        doc.xpath("//network-security-config/domain-config").remove
-        
-        # Loop every domains param and modify the xml file to add <domain-config> element
-        domains.each do |domain|
-          certificate_info = Helper::AndroidSslPinningHelper.get_certificate_info(domain)
-
-          # Add elements
-          domain_config_element = Nokogiri::XML::Node.new('domain-config', doc)
+        if params
+          xml_path = params[:xml_path]
+          domains = params[:domains]
           
-          domain_element = Nokogiri::XML::Node.new("domain", doc)
-          domain_element.content = certificate_info["domain"]
-          domain_element.set_attribute("includeSubdomains", certificate_info["is_wildcard"] ? "true" : "false")
-          
-          pinset_element = Nokogiri::XML::Node.new("pin-set", doc)
-          pinset_element.set_attribute("expiration", certificate_info["expiration_date"])
+          # Open XML for modification
+          doc = File.open(xml_path) { |f| Nokogiri::XML(f) }
 
-          pin_element = Nokogiri::XML::Node.new("pin", doc)
-          pin_element.set_attribute("digest", "SHA-256")
-          pin_element.content = certificate_info["fingerprint"]
-
-          pinset_element.add_child(pin_element)
-          domain_config_element.add_child(domain_element)
-          domain_config_element.add_child(pinset_element)
+          # Remove all <domain-config> elements
+          doc.xpath("//network-security-config/domain-config").remove
           
-          doc.at('//network-security-config').add_child(domain_config_element)
-          UI.message("~~> Configured for domain #{domain}")
+          # Loop every domains param and modify the xml file to add <domain-config> element
+          domains.each do |domain|
+            certificate_info = Helper::AndroidSslPinningHelper.get_certificate_info(domain)
+
+            # Add elements
+            domain_config_element = Nokogiri::XML::Node.new('domain-config', doc)
+            
+            domain_element = Nokogiri::XML::Node.new("domain", doc)
+            domain_element.content = certificate_info["domain"]
+            domain_element.set_attribute("includeSubdomains", certificate_info["is_wildcard"] ? "true" : "false")
+            
+            pinset_element = Nokogiri::XML::Node.new("pin-set", doc)
+            pinset_element.set_attribute("expiration", certificate_info["expiration_date"])
+
+            pin_element = Nokogiri::XML::Node.new("pin", doc)
+            pin_element.set_attribute("digest", "SHA-256")
+            pin_element.content = certificate_info["fingerprint"]
+
+            pinset_element.add_child(pin_element)
+            domain_config_element.add_child(domain_element)
+            domain_config_element.add_child(pinset_element)
+            
+            doc.at('//network-security-config').add_child(domain_config_element)
+            UI.message("~~> Configured for domain #{domain}")
+          end
+
+          File.open(xml_path, 'w') { |file| file.write(doc.to_xml) }
+          UI.success("🎉 Successfully setup SSL Pinning")
         end
-
-        File.open(xml_path, 'w') { |file| file.write(doc.to_xml) }
-        UI.success("🎉 Successfully setup SSL Pinning")
       end
 
       def self.description

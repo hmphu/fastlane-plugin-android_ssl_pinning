@@ -13,19 +13,20 @@ module Fastlane
         ssl_socket.hostname = domain_name
         ssl_socket.connect
         certificate = ssl_socket.peer_cert
+        public_key = certificate.public_key
 
         # Extract the desired information
         domain = certificate.subject.to_a.find { |name, _, _| name == 'CN' }[1]
         expiration_date = Date.parse(certificate.not_after.to_s)
 
         digest = OpenSSL::Digest.new('SHA256')
-        fingerprint = digest.hexdigest(certificate.to_der)
+        fingerprint = digest.hexdigest(public_key.to_der)
         fingerprint = Base64.strict_encode64([fingerprint].pack('H*'))
         
 
         # Create and return the certificate object
         certificate_obj = {
-          "domain" => domain.sub(/^\*\./, '') ,
+          "domain" => domain.sub(/^\*\./, ''),
           "is_wildcard" => domain.start_with?('*'),
           "expiration_date" => expiration_date,
           "fingerprint" => fingerprint
